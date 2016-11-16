@@ -1,0 +1,622 @@
+<!doctype html> 
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Pong</title>
+
+	<!-- Basic styling, centering the canvas -->
+	<style>
+	canvas {
+		display: block;
+		position: absolute;
+		margin: auto;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		right: 0;
+	}
+	</style>
+</head>
+<body>
+<script src="synaptic-master/dist/synaptic.min.js"></script>    
+<script>
+
+var
+/**
+<script src="https://cdnjs.cloudflare.com/ajax/libs/synaptic/1.0.4/synaptic.min.js">    
+ * Constants
+ */
+WIDTH  = 700,
+HEIGHT = 600,
+pi = Math.PI,
+UpArrow   = 38,
+DownArrow = 40,
+
+Reset = 32,  // space key - reset the score
+
+aKey = 65,   // a key - switch on math training
+astate = 1,
+
+bKey = 66,   // b key - flip opponent between manual and pseudo ai 
+bstate = 0,
+fbstate = 0,
+
+fKey = 70,   // f key - speed up the process
+fstate = 0,
+kfstate = 0,
+
+sKey = 83,   // s key - halt/pause the process 
+ksstate =0,
+sstate =0,
+
+rKey = 82,   // r key - switch on the reward based learning
+rstate = 0,
+rcheck = 0,
+
+Score1 = 0,
+Score2 = 0,
+
+kstate = 0,
+
+save_ball_y = 0, // save Y position of ball when R1 or R5 gets triggered
+
+Epochs_Display = Pred_Epochs = Reward_Epochs = 0,
+This_Epochs_Display = 0,
+Nontrained = 0,
+Ratio = 0,
+RatioCount = 0,
+
+//Reward Variables
+R1check = R1 = R1count = 0,
+R2check = R2 = R2count = 0, 
+R3check = R3 = R3count = 0,
+R4check = R4 = R4count = 0,
+R5check = R5 = R5count = 0,
+R6 = 0,
+
+/**
+ * Game elements
+ */
+canvas,
+ctx,
+keystate,
+
+
+/**
+ * The player paddle
+ * 
+ * @type {Object}
+ */
+player = {
+	x: null,
+	y: null,
+	width:  20,
+	height: 100,
+	/**
+	 * Update the position depending on pressed keys
+	 */
+	update: function() {
+		if( bstate ) {
+		   if (keystate[UpArrow]) this.y -= 7;
+		   if (keystate[DownArrow]) this.y += 7;
+         } else {
+         
+			// calculate ideal position
+			var desty = ball.y - (this.height - ball.side)*0.5;
+			// ease the movement towards the ideal position
+			this.y += (desty - this.y)*0.2 +Math.random()*100-50;
+        }		
+		// keep the paddle inside of the canvas
+		this.y = Math.max(Math.min(this.y, HEIGHT - this.height), 0);
+	},
+	/**
+	 * Draw the player paddle to the canvas
+	 */
+	draw: function() {
+		ctx.fillRect(this.x, this.y, this.width, this.height);
+
+	}
+},
+/**
+ * The ai paddle
+ * 
+ * @type {Object}
+ */
+ai = {
+	x: null,
+	y: null,
+	width:  20,
+	height: 100,
+	paddle_pos_pred_inputs: null, // input values for Prediction net
+	saved_paddle_pos: 0,
+	paddle_pos_prediction: 0,
+    rflag : 0,
+	
+	predicted:0,
+    Prediction :null,
+    counter: 0,  
+     /**
+	 * Update the position depending on the ball position
+	 */
+    init: function() {
+    
+        // initialize the networks
+        console.log("Initializing networks...");       
+        this.Prediction = new synaptic.Architect.Perceptron(6,10,1);
+
+    },
+    
+	update: function() {
+		  
+		  /////////////////////////////////////////////////
+		   
+		  // ball moves to the right but is still on the left side of the screen
+		  // reward R1 and R5 have not been triggered / are still to be harvested
+		  
+		  if(ball.pred_y >= 0 && ball.x > 100 && R1 == 0 && R5 == 0 ) {  
+		       
+			    // prediction yet (for this epoch)? 
+			    if( this.predicted == 0 )  {
+   				      RatioCount++; // count each time the ball moves to the left
+		  
+					  // set value of prediction neural net
+					  this.paddle_pos_pred_inputs = [
+						ball.y/HEIGHT,
+						(HEIGHT-ball.y)/HEIGHT,
+						(ball.vel.y>0?ball.vel.y/18:0),   
+						(ball.vel.y<=0?-ball.vel.y/18:0),   
+						ball.vel.x/18,   
+						(Math.atan(ball.phi) + 0.5*Math.PI)/Math.PI,
+					  ];
+			          
+                      // use net to predict where the paddle should be  		
+					  this.paddle_pos_prediction = this.Prediction.activate(this.paddle_pos_pred_inputs)[0];
+				  
+					  // set default paddle position to prediction
+					  this.saved_paddle_pos = this.paddle_pos_prediction * HEIGHT;
+					  	  
+			          // if MATH Learning switched ON 
+					  if (astate) {
+					  
+					     Pred_Epochs++;
+						 Epochs_Display++;
+						 This_Epochs_Display++;
+						 
+						 // make the math "prediction" aka calculate where the paddle should be 
+						 var math_calc_paddle_pos = ball.pred_y - (this.height - ball.side)/2; 
+						 math_calc_paddle_pos = Math.max(Math.min(math_calc_paddle_pos, HEIGHT - this.height), 0);
+			        	 
+			        	 var math_paddle_pos_prediction	= math_calc_paddle_pos/HEIGHT;	         
+						 
+						 // train the net with the mathematical correct position
+						 this.Prediction.propagate(0.2, [math_paddle_pos_prediction]);
+						 // re-activate with adjusted weights
+						 this.paddle_pos_prediction = this.Prediction.activate(this.paddle_pos_pred_inputs);
+						   				 
+  						 // set paddle to mathematically correct position  
+				         this.saved_paddle_pos = math_calc_paddle_pos; 
+				         
+					  } else                       
+			   		  if ( rstate == 1  ) {
+				         
+				         Reward_Epochs++;
+						 Epochs_Display++;
+						 This_Epochs_Display++;
+						 
+						 // make a random guess where the paddle should be 
+						 var rand_paddle_pos = Math.random() * HEIGHT - (this.height - ball.side)/2; 
+						 rand_paddle_pos = Math.max(Math.min(rand_paddle_pos, HEIGHT - this.height), 0);
+						 
+						 this.paddle_pos_prediction = rand_paddle_pos/HEIGHT
+  						 // set paddle to mathematically correct position  
+				         this.saved_paddle_pos  = rand_paddle_pos; 
+				         
+				         this.rflag = 1;
+			   		  
+                      } else  {
+						 Nontrained++;						  
+                      }  
+                        
+					// flag prediction
+					this.predicted = 1;
+				   
+				 } 
+		   
+		   } else {
+						
+				 // ball moves back (right to left) -> reset prediction  
+		         this.predicted = 0; 
+          }
+ 
+          // postion paddle
+          this.y = this.saved_paddle_pos;
+          
+          // Reward function 1 --> our paddle is returning the ball
+		  if(R1 == 1 ) {
+			  R1 = 0; R5 = 0;
+		      if(rstate) {
+		        if (this.rflag == 1) {
+			        this.rflag = 0;
+			        this.Prediction.propagate(0.2, [this.paddle_pos_prediction]);
+			    }
+			  }  
+		  } 
+		  
+		  // Reward function 5 --> our paddle misses the ball - negative reward
+		  if(R5 == 1 ) {
+			  R5 = 0; R1 = 0;
+		      if(rstate) {
+		        if (this.rflag == 1) {
+			        this.rflag = 0;
+			    }
+		      }    
+		  }  
+		   
+	},
+	/**
+	 * Draw the ai paddle to the canvas
+	 */
+	draw: function() {
+	
+		ctx.fillRect(this.x, this.y, this.width, this.height);
+		if( ball.pred_y >= 0) {
+		   math_calc_paddle_pos = ball.pred_y - (this.height - ball.side) /2;
+           math_calc_paddle_pos = Math.max(Math.min(math_calc_paddle_pos, HEIGHT - this.height), 0);
+		   ctx.fillStyle = "#f00";
+		   ctx.fillRect(this.x+this.width, math_calc_paddle_pos, this.width, this.height);
+		   R6=0;
+		} 
+	    if(R6 == 1 ) {
+	       ctx.fillStyle = "#00f";
+	        var paddle_pos = save_ball_y - (this.height - ball.side)/2; 
+				 paddle_pos = Math.max(Math.min(paddle_pos, HEIGHT - this.height), 0);
+		   ctx.fillRect(this.x, paddle_pos, this.width, this.height);
+        }
+	    ctx.fillStyle = "#fff";
+	}
+},
+/**	
+ * The ball object
+ * 
+ * @type {Object}
+ */
+ball = {
+	x:   null,
+	y:   null,
+	real_width: null,
+	real_height: null,
+	vel: null,
+	side:  20,
+	speed: 12,
+    phi: null,
+    pred_y: null,
+	
+	
+	/**
+	 * Serves the ball towards the specified side
+	 * 
+	 * @param  {number} side 1 right
+	 *                       -1 left
+	 */
+	serve: function(side) {
+		// set the x and y position
+		var r = Math.random();
+		this.x = side===1 ? player.x+player.width : ai.x - this.side;
+		this.y = (HEIGHT - this.side)*r;
+		// calculate out-angle, higher/lower on the y-axis =>
+		// steeper angle
+		this.phi = 0.1*pi*(1 - 2*r);
+		// set velocity direction and magnitude
+		this.vel = {
+			x: side*this.speed*Math.cos(this.phi),
+			y: this.speed*Math.sin(this.phi)
+		}
+	},
+	/**
+	 * Update the ball position and keep it within the canvas
+	 */
+	update: function() {
+		// update position with current velocity
+		this.x += this.vel.x;
+		this.y += this.vel.y;
+		
+		// check if out of the canvas in the y direction
+		if (0 > this.y || this.y+this.side > HEIGHT) {
+			// calculate and add the right offset, i.e. how far
+			// inside of the canvas the ball is
+			var offset = this.vel.y < 0 ? 0 - this.y : HEIGHT - (this.y+this.side);
+			this.y += 2*offset;
+			// mirror the y velocity
+			this.vel.y *= -1;
+			this.phi = 2*pi-this.phi; // added by matt
+		}
+		
+		// helper function to check intesectiont between two
+		// axis aligned bounding boxex (AABB)
+		var AABBIntersect = function(ax, ay, aw, ah, bx, by, bw, bh) {
+			return ax < bx+bw && ay < by+bh && bx < ax+aw && by < ay+ah;
+		};
+		
+		// check againts target paddle to check collision in x
+		// direction
+		var pdle = this.vel.x < 0 ? player : ai;
+		
+		if (AABBIntersect(pdle.x, pdle.y, pdle.width, pdle.height,
+				this.x, this.y, this.side, this.side)
+		) {	
+		    if( pdle===ai ) {
+				  R1count++;
+				  R1 = 1;
+				  save_ball_y = this.y;
+			}	  
+			// set the x position and calculate reflection angle
+			this.x = pdle===player ? player.x+player.width : ai.x - this.side;
+			var n = (this.y+this.side - pdle.y)/(pdle.height+this.side);
+			this.phi = 0.25*pi*(2*n - 1); // pi/4 = 45
+			// calculate smash value and update velocity
+			var smash = Math.abs(this.phi) > 0.2*pi ? 1.5 : 1;
+			if( pdle===ai && smash == 1.5 ) {
+		      if( rstate ) {
+				  R4count++;
+				  R4 = 1;
+			   }	  
+			}  	
+			this.vel.x = smash*(pdle===player ? 1 : -1)*this.speed*Math.cos(this.phi);
+			this.vel.y = smash*this.speed*Math.sin(this.phi);
+		}
+		
+		this.pred_y = -1;	
+		if (this.vel.x > 0) {
+		    var pred_y = this.y + (ball.real_width - this.x) * Math.tan(this.phi);
+			if( ( pred_y >= 0 && pred_y  <= HEIGHT )  ) {            	
+            	this.pred_y = pred_y;
+         	} else
+         	if( pred_y < 0) {            	
+            	this.pred_y = -pred_y;
+         	} else
+         	if( pred_y  > HEIGHT) {            	
+            	this.pred_y = HEIGHT-(pred_y + 2* this.side-HEIGHT); // fixed the issue bouncing on the bottom wall
+         	} 
+        }
+        
+		// reset the ball when ball outside of the canvas in the
+		// x direction, also increment scores by 1.
+		if (0 > this.x+this.side) {
+		    this.pred_y = -1;	
+			this.serve(pdle===player ? 1 : -1);
+			Score2++;
+	  	    if( rstate ) {
+			  R2count++;
+			  R2 = 1;
+		    }	  
+	 	   if( RatioCount > 0 )  {
+			Ratio = (RatioCount + Ratio * 10) / 11;
+			RatioCount = 0;
+			}  
+			
+		}else if (this.x + this.side + ai.width> WIDTH) {
+		     // our paddle misses the ball
+			R5count++;
+			this.pred_y = -1;	
+			R5 = 1;
+			R6 = 1;
+			save_ball_y = this.y;
+			
+			this.serve(pdle===player ? 1 : -1);
+			Score1++;
+	 		RatioCount = 0;
+		}		
+	},
+	/**
+	 * Draw the ball to the canvas
+	 */
+	draw: function() {
+		ctx.fillRect(this.x, this.y, this.side, this.side);
+		if( this.pred_y >= 0) {
+		ctx.fillStyle = "#f00";
+		ctx.fillRect(0, this.pred_y, this.side, this.side);
+		} else {
+		ctx.fillStyle = "#0f0";
+		ctx.fillRect(0, 0, this.side, this.side);
+		} 
+		
+		ctx.fillStyle = "#fFF";
+
+	}
+};
+
+
+/**
+ * Starts the game
+ */
+function main() {
+	// create, initiate and append game canvas
+	canvas = document.createElement("canvas");
+	canvas.width = WIDTH;
+	canvas.height = HEIGHT;
+	ctx = canvas.getContext("2d");
+	document.body.appendChild(canvas);
+	keystate = {};
+	// keep track of keyboard presses
+	document.addEventListener("keydown", function(evt) {
+		keystate[evt.keyCode] = true;
+	});
+	document.addEventListener("keyup", function(evt) {
+		delete keystate[evt.keyCode];
+	});
+	init(); // initiate game objects
+	// game loop function
+	var loop = function() {
+	
+	 //For predict training
+	 if (keystate[aKey]) {
+	 	if( kstate == 0) {
+		  astate = 1 - astate;
+		  kstate = 1;
+		  This_Epochs_Display = 0;
+		  rstate = 0;
+		  Score1 = Score2 = Nontrained = 0;
+		}  
+	} else 
+		kstate= 0;
+    //
+
+	//For reward training
+	 if (keystate[rKey]) {
+	 	if( rcheck == 0) {
+		  rstate = 1 - rstate;
+		  rcheck = 1;
+		  This_Epochs_Display = 0;
+		  astate = 0;
+		  Score1 = Score2 = Nontrained = 0;
+		}  
+	} else 
+		rcheck= 0;
+	//
+
+   if (keystate[sKey] ) {
+	 	if( ksstate == 0) {
+		  sstate = 1 - sstate;
+		  ksstate = 1;
+		}  
+	} else 
+		ksstate= 0;
+    
+   if (keystate[bKey]) {
+	 	if( kbstate == 0) {
+		  bstate = 1 - bstate;
+		  kbstate = 1;
+		}  
+	} else 
+		kbstate= 0;
+			  
+	 if (keystate[fKey]) {
+            if( kfstate == 0) {
+   		      if( fstate++ > 1)
+   		       fstate = 0;
+		      kfstate = 1;
+		    }  
+	      } 
+	      else kfstate= 0;
+
+      if(sstate == 0) {
+	      
+			if( fstate == 2)
+			  for(var i=0; i<5000; i++) {
+				update();
+				if( keystate[fKey] ) 
+				 break;
+			  }	
+		  
+			if(fstate == 1) {
+				update();
+				draw();
+				update();
+				draw();
+				update();
+				draw();
+				update();
+				draw();
+				update();
+				draw();
+				update();
+				draw();
+				update();
+				draw();
+				update();
+				draw();
+				update();
+				draw();
+				update();
+				draw();
+			}
+			update();
+			draw();
+		}	
+		window.requestAnimationFrame(loop, canvas);
+	};
+	window.requestAnimationFrame(loop, canvas);
+}
+/**
+ * Initatite game objects and set start positions
+ */
+function init() {
+	player.x = player.width;
+	player.y = (HEIGHT - player.height)/2;
+	ai.x = WIDTH - (player.width + ai.width);
+	ai.y = (HEIGHT - ai.height)/2;
+	ball.real_width  = ai.x - player.x;
+	ball.real_height = HEIGHT;
+	ball.serve(1);
+    ai.init();
+}
+/**
+ * Update all game objects
+ */
+function update() {
+	ball.update();
+	player.update();
+	ai.update();
+	if (keystate[Reset]) Score2 = Score1 = Nontrained = 0;
+  }
+
+/**
+ * Clear canvas and draw all game objects and net
+ */
+function draw() {
+	ctx.fillRect(0, 0, WIDTH, HEIGHT);
+	ctx.save();
+	ctx.fillStyle = "#fff";
+	ball.draw();
+	player.draw();
+	ai.draw();
+	
+	ctx.fillText(Score1, 175, HEIGHT-20);
+	ctx.fillText(Score2, 175*3, HEIGHT-20);
+	ctx.fillText("Total Epochs Trained: " + Epochs_Display, 100, 20);
+	ctx.fillText("Prediction Epochs Trained: " + Pred_Epochs, 100, 30);
+	ctx.fillText("Reward Epochs Trained: " + Reward_Epochs, 100, 40);
+	ctx.fillText("Epochs This Cycle: " + This_Epochs_Display, 100, 50);
+	ctx.fillText("Non-trained Epochs Since Last Reset: " + Nontrained, 100, 60);
+	ctx.fillText("Score-to-Epoch Ratio (at 1000 points): " + Ratio.toFixed(4), 100, 70);
+    ctx.fillText("Max Certainty: " + ai.mean_certainty, 100,80);
+
+	if (astate == 1) {
+		if (rstate== 1) {
+		rstate = 0;
+		//This_Epochs_Display = 0;
+		}
+		ctx.fillText("Prediction Training On. Press 'A' to turn off.", 425, 20);
+		ctx.fillText("Reward Training Off. Press 'R' to turn on.", 425, 30);
+	}
+	if (rstate == 1) {
+		if (astate == 1) {
+			astate =  0;
+			//This_Epochs_Display = 0;
+		}
+		ctx.fillText("Prediction Training Off. Press 'A' to turn on.", 425, 20);
+		ctx.fillText("Reward Training On. Press 'R' to turn off.", 425, 30);
+	}
+	if (rstate == 0 && astate == 0) {
+		This_Epochs_Display = 0;
+		ctx.fillText("Prediction Training Off. Press 'A' to turn on.", 425, 20);
+		ctx.fillText("Reward Training Off. Press 'R' to turn off.", 425, 30);
+	}
+
+
+	// draw the net
+	var w = 4;
+	var x = (WIDTH - w)*0.5;
+	var y = 0;
+	var step = HEIGHT/20; // how many net segments
+	while (y < HEIGHT) {
+		ctx.fillRect(x, y+step*0.25, w, step*0.5);
+		y += step;
+	}
+	ctx.restore();
+}
+// start and run the game
+main();
+</script>
+</body>
+</html>
