@@ -10,13 +10,13 @@ Instructions for the Game, using keyboard controls:
 
 "F": Changes speed of play between 3 different settings, useful for training quickly
 
-"B": Switches "near-perfect player" (the non-learning AI) to manual control, where the paddle position can be moved up and down with the arrow keys.
+"B": Switches "near-perfect player" (left paddle, the non-learning AI) to manual control, where the paddle position can be moved up and down with the arrow keys.
 
 "S": Pauses and unpauses the game
 
 Space Bar: Resets score counters at bottom of screen
 
-In this game, the paddle on the right is controlled by the self-learning AI, whereas the left paddle is supposed to represent the near-perfect expert human player. The smart AI starts with training mode on as a default, so hit "A" right off the bat to let the AI perform on its own (notice that it is incapable of performing at all in the beggining). The red rectangle you see on the right shows where the paddle should go if it's going to return the ball. 
+In this game, the paddle on the right is controlled by the self-learning AI, whereas the left paddle is supposed to represent the near-perfect expert human player, which perfectly follows the ball's movement but wobbles a little so as to be able to miss occasionally. The self-learning AI starts with training mode on as a default, so hit "A" right off the bat to let the AI perform on its own (notice that it is incapable of performing at all in the beggining). The red rectangle you see on the right shows where the paddle should go if it's going to return the ball. 
 
 The AI needs to train for a bit before it gets really good. First, hit "A" to turn on prediction training, which allows the AI to get a basic sense of how the game works using a simple network. Hitting "F" to cycle through speeds of play, let the game run for about 50,000 epochs at the fastest speed (make sure that in the upper right corner of the display, it says "Prediction Training On"). An epoch here is one full cycle of the ball from the left to the right of the field, or one play. After 50,000 epochs (which goes fast- there's a display that says "Total Epochs Trained" in the upper left corner), hit "R" to switch the game into reward training mode (be sure it says "Reward Training On"). Do reward training on the highest speed until "Total Epochs Trained" hits 1 million epochs. This'll take about 5 minutes at the fastest speed; this can be left running in the background, but you may need to have it open in its own window because they game only plays when its tab is currently open. 
 
