@@ -1,13 +1,19 @@
 # CogSci-Paper
 
-This HTML file is one of the neural network-enabled Pong scripts that Matt Oberdorfer and I developed over the summer. To get it to run, you first need to download Juan Cazala's Synaptic library at https://github.com/cazala/synaptic. To do this, click the button that says "Clone or Download", click "Download ZIP", and then unzip the folder. Doing so should allow the Pong game to play in-browser just by downloading the HTML file and then double-clicking it. 
+This HTML file is one of the neural network-enabled Pong scripts that Matt Oberdorfer (my coauthor) and I developed over the summer. To get it to run, you first need to download Juan Cazala's Synaptic library at https://github.com/cazala/synaptic. To do this, click the button that says "Clone or Download", click "Download ZIP", and then unzip the folder. Doing so should allow the Pong game to play in-browser just by downloading the HTML file and then double-clicking it. 
 
 Instructions for the Game, using keyboard controls:
+
 "A": Switches prediction learning on and off 
+
 "R": Switches reward learning on and off
+
 "F": Changes speed of play between 3 different settings, useful for training quickly
+
 "B": Switches "near-perfect player" (the non-learning AI) to manual control, where the paddle position can be moved up and down with the arrow keys.
+
 "S": Pauses and unpauses the game
+
 Space Bar: Resets score counters at bottom of screen
 
 In this game, the paddle on the right is controlled by the self-learning AI, whereas the left paddle is supposed to represent the near-perfect expert human player. The smart AI starts with training mode on as a default, so hit "A" right off the bat to let the AI perform on its own (notice that it is incapable of performing at all in the beggining). The red rectangle you see on the right shows where the paddle should go if it's going to return the ball. Now hit "R" to turn on the reward-based training mode, where the AI learns how to play based on the "reward" it gets from successfully returning the ball. 
