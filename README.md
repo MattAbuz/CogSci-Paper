@@ -1,6 +1,6 @@
 # CogSci-Paper
 
-This HTML file is one of the neural network-enabled Pong scripts that Matt Oberdorfer (my coauthor) and I developed over the summer. To get it to run, you first need to download Juan Cazala's Synaptic library at https://github.com/cazala/synaptic. To do this, click the button that says "Clone or Download", click "Download ZIP", and then unzip the folder. Doing so should allow the Pong game to play in-browser just by downloading the HTML file and then double-clicking it. 
+This HTML file is one of the neural network-enabled Pong scripts that Matt Oberdorfer (my coauthor) and I developed over the summer. To get it to run, you first need to download this folder containing the HTML file. To do this, on the main page of this folder, click the green button that says "Clone or Download", click "Download ZIP", and then unzip the folder/extract all. You also need to do the same process for Juan Cazala's Synaptic library at https://github.com/cazala/synaptic. Then (this is essential), move the unzipped folder "synaptic-master" into the unzipped folder "CogSci-Paper-master".  Doing so should allow the Pong game to play in-browser just by downloading the HTML file and then double-clicking it. 
 
 Instructions for the Game, using keyboard controls:
 
